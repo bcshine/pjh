@@ -1,0 +1,20 @@
+# API 키 보호
+config.js
+
+# 로그 파일
+*.log
+
+# 운영체제 파일
+.DS_Store
+Thumbs.db
+
+# 임시 파일
+*.tmp
+*.temp
+
+# 에디터 설정
+.vscode/
+.idea/
+
+# 캐시 파일
+.cache/ 
