@@ -43,16 +43,12 @@
             <!-- 사진 업로드 섹션 -->
             <section class="upload-section" id="uploadSection">
                 <h2 class="section-title">사진 업로드</h2>
-                <div class="upload-area" id="uploadArea">
-                    <div class="upload-content">
-                        <div class="upload-icon">📷</div>
-                        <p class="upload-text">사진을 클릭하거나 드래그해서 업로드하세요</p>
-                        <button class="camera-btn" id="cameraBtn">카메라 촬영</button>
-                        <button class="gallery-btn" id="galleryBtn">갤러리에서 선택</button>
-                    </div>
+                <div class="upload-buttons">
+                    <button class="camera-btn" id="cameraBtn">카메라 촬영</button>
+                    <button class="gallery-btn" id="galleryBtn">갤러리에서 선택</button>
                 </div>
                 <input type="file" id="fileInput" accept="image/*" capture="environment" style="display: none;">
-                <input type="file" id="galleryInput" accept="image/*" style="display: none;">
+                <input type="file" id="galleryInput" accept="image/*,image/jpeg,image/jpg,image/png,image/gif,image/webp" style="display: none;">
             </section>
 
             <!-- 이미지 미리보기 -->

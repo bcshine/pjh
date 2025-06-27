@@ -8,7 +8,6 @@ const elements = {
     sampleItems: document.querySelectorAll('.sample-item'),
     
     // 업로드 관련
-    uploadArea: document.getElementById('uploadArea'),
     cameraBtn: document.getElementById('cameraBtn'),
     galleryBtn: document.getElementById('galleryBtn'),
     fileInput: document.getElementById('fileInput'),
@@ -40,6 +39,13 @@ const elements = {
 document.addEventListener('DOMContentLoaded', initializeApp);
 
 function initializeApp() {
+    console.log('앱 초기화 시작');
+    
+    // DOM 요소 확인
+    console.log('galleryBtn:', elements.galleryBtn);
+    console.log('galleryInput:', elements.galleryInput);
+    console.log('fileInput:', elements.fileInput);
+    
     // 샘플 이미지 클릭 이벤트
     elements.sampleItems.forEach(item => {
         item.addEventListener('click', () => handleSampleImageClick(item));
@@ -47,23 +53,19 @@ function initializeApp() {
     
     // 카메라 버튼
     elements.cameraBtn.addEventListener('click', () => {
+        console.log('카메라 버튼 클릭');
         elements.fileInput.click();
     });
     
     // 갤러리 버튼
     elements.galleryBtn.addEventListener('click', () => {
+        console.log('갤러리 버튼 클릭');
         elements.galleryInput.click();
     });
     
     // 파일 업로드 이벤트
     elements.fileInput.addEventListener('change', handleFileSelect);
     elements.galleryInput.addEventListener('change', handleFileSelect);
-    
-    // 드래그 앤 드롭
-    elements.uploadArea.addEventListener('dragover', handleDragOver);
-    elements.uploadArea.addEventListener('dragleave', handleDragLeave);
-    elements.uploadArea.addEventListener('drop', handleDrop);
-    elements.uploadArea.addEventListener('click', () => elements.galleryInput.click());
     
     // 분석 버튼
     elements.analyzeBtn.addEventListener('click', analyzeImage);
@@ -100,50 +102,52 @@ async function handleSampleImageClick(item) {
 
 // 파일 선택 처리
 function handleFileSelect(event) {
+    console.log('파일 선택 이벤트 발생:', event.target.files);
+    
     const file = event.target.files[0];
-    if (file && file.type.startsWith('image/')) {
+    if (!file) {
+        console.log('선택된 파일이 없습니다.');
+        return;
+    }
+    
+    console.log('선택된 파일:', file.name, file.type, file.size);
+    
+    if (file.type.startsWith('image/')) {
         currentImageFile = file;
+        console.log('이미지 파일 확인됨, 미리보기 생성 중...');
+        
         const reader = new FileReader();
         reader.onload = (e) => {
+            console.log('파일 읽기 완료, 미리보기 표시');
             showPreview(e.target.result);
+        };
+        reader.onerror = (e) => {
+            console.error('파일 읽기 오류:', e);
+            alert('파일을 읽을 수 없습니다.');
         };
         reader.readAsDataURL(file);
+    } else {
+        console.log('이미지 파일이 아닙니다:', file.type);
+        alert('이미지 파일을 선택해주세요.');
     }
 }
 
-// 드래그 오버 처리
-function handleDragOver(event) {
-    event.preventDefault();
-    elements.uploadArea.classList.add('dragover');
-}
 
-// 드래그 리브 처리
-function handleDragLeave(event) {
-    event.preventDefault();
-    elements.uploadArea.classList.remove('dragover');
-}
-
-// 드롭 처리
-function handleDrop(event) {
-    event.preventDefault();
-    elements.uploadArea.classList.remove('dragover');
-    
-    const files = event.dataTransfer.files;
-    if (files.length > 0 && files[0].type.startsWith('image/')) {
-        currentImageFile = files[0];
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            showPreview(e.target.result);
-        };
-        reader.readAsDataURL(files[0]);
-    }
-}
 
 // 미리보기 표시
 function showPreview(imageSrc) {
+    console.log('미리보기 표시 함수 호출:', imageSrc ? '이미지 있음' : '이미지 없음');
+    
+    if (!imageSrc) {
+        console.error('이미지 소스가 없습니다.');
+        return;
+    }
+    
     elements.previewImage.src = imageSrc;
     elements.previewSection.style.display = 'block';
     elements.previewSection.classList.add('fade-in');
+    
+    console.log('미리보기 섹션 표시됨');
     
     // 스크롤을 미리보기 섹션으로 이동
     elements.previewSection.scrollIntoView({ behavior: 'smooth' });
