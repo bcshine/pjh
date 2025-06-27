@@ -5,18 +5,18 @@ let userApiKey = null;
 
 // API 키 관리
 function initializeApiKey() {
-    // 로컬스토리지에서 API 키 확인
-    const savedApiKey = localStorage.getItem('gemini_api_key');
-    if (savedApiKey) {
-        userApiKey = savedApiKey;
-        console.log('저장된 API 키 발견');
+    // 1순위: config.js에서 API 키 확인 (GitHub Actions 또는 로컬 환경)
+    if (window.CONFIG && window.CONFIG.GEMINI_API_KEY && window.CONFIG.GEMINI_API_KEY !== 'YOUR_GEMINI_API_KEY_HERE') {
+        userApiKey = window.CONFIG.GEMINI_API_KEY;
+        console.log('config.js에서 API 키 발견 (자동 배포)');
         return true;
     }
     
-    // config.js에서 API 키 확인 (로컬 환경용)
-    if (window.CONFIG && window.CONFIG.GEMINI_API_KEY) {
-        userApiKey = window.CONFIG.GEMINI_API_KEY;
-        console.log('config.js에서 API 키 발견');
+    // 2순위: 로컬스토리지에서 API 키 확인
+    const savedApiKey = localStorage.getItem('gemini_api_key');
+    if (savedApiKey) {
+        userApiKey = savedApiKey;
+        console.log('로컬스토리지에서 저장된 API 키 발견');
         return true;
     }
     
