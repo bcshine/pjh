@@ -106,8 +106,21 @@
         </footer>
     </div>
 
+    <!-- API 키 입력 모달 -->
+    <div id="apiKeyModal" class="api-modal" style="display: none;">
+        <div class="api-modal-content">
+            <h3>🔑 API 키 설정</h3>
+            <p>Gemini API 키를 입력해주세요:</p>
+            <input type="password" id="apiKeyInput" placeholder="AIzaSy..." class="api-input">
+            <div class="api-buttons">
+                <button id="saveApiKey" class="api-save-btn">저장</button>
+                <a href="https://makersuite.google.com/app/apikey" target="_blank" class="api-help-btn">API 키 발급받기</a>
+            </div>
+            <p class="api-help-text">※ API 키는 브라우저에만 저장되며 외부로 전송되지 않습니다.</p>
+        </div>
+    </div>
+
     <!-- JavaScript 파일들 -->
-    <script src="config.js"></script>
     <script src="script.js"></script>
 </body>
 </html> 

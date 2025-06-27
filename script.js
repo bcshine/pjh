@@ -1,6 +1,61 @@
 // 전역 변수
 let currentImageFile = null;
 let currentImageData = null;
+let userApiKey = null;
+
+// API 키 관리
+function initializeApiKey() {
+    // 로컬스토리지에서 API 키 확인
+    const savedApiKey = localStorage.getItem('gemini_api_key');
+    if (savedApiKey) {
+        userApiKey = savedApiKey;
+        console.log('저장된 API 키 발견');
+        return true;
+    }
+    
+    // config.js에서 API 키 확인 (로컬 환경용)
+    if (window.CONFIG && window.CONFIG.GEMINI_API_KEY) {
+        userApiKey = window.CONFIG.GEMINI_API_KEY;
+        console.log('config.js에서 API 키 발견');
+        return true;
+    }
+    
+    console.log('API 키가 없어서 입력 모달 표시');
+    return false;
+}
+
+function showApiKeyModal() {
+    const modal = document.getElementById('apiKeyModal');
+    const input = document.getElementById('apiKeyInput');
+    const saveBtn = document.getElementById('saveApiKey');
+    
+    modal.style.display = 'flex';
+    input.focus();
+    
+    // 저장 버튼 이벤트
+    saveBtn.onclick = function() {
+        const apiKey = input.value.trim();
+        if (apiKey && apiKey.startsWith('AIza')) {
+            userApiKey = apiKey;
+            localStorage.setItem('gemini_api_key', apiKey);
+            modal.style.display = 'none';
+            showToast('API 키가 저장되었습니다!');
+        } else {
+            alert('올바른 API 키를 입력해주세요.\n(AIza로 시작하는 키)');
+        }
+    };
+    
+    // 엔터키로 저장
+    input.onkeypress = function(e) {
+        if (e.key === 'Enter') {
+            saveBtn.click();
+        }
+    };
+}
+
+function getApiKey() {
+    return userApiKey;
+}
 
 // DOM 요소들
 const elements = {
@@ -40,6 +95,12 @@ document.addEventListener('DOMContentLoaded', initializeApp);
 
 function initializeApp() {
     console.log('앱 초기화 시작');
+    
+    // API 키 초기화
+    if (!initializeApiKey()) {
+        // API 키가 없으면 모달 표시
+        setTimeout(() => showApiKeyModal(), 1000);
+    }
     
     // DOM 요소 확인
     console.log('galleryBtn:', elements.galleryBtn);
@@ -164,20 +225,99 @@ async function analyzeImage() {
         // 로딩 표시
         showLoading();
         
-        // 이미지를 base64로 변환
-        const base64Data = await convertToBase64(currentImageFile);
+        // 1단계: API 키 확인
+        console.log('1단계: API 키 확인 중...');
+        if (!getApiKey()) {
+            showApiKeyModal();
+            throw new Error('API 키가 설정되지 않았습니다.');
+        }
         
-        // Gemini API 호출
+        // 2단계: 이미지 크기 확인 및 압축
+        console.log('2단계: 이미지 처리 중...', currentImageFile.size, 'bytes');
+        const processedFile = await processImage(currentImageFile);
+        
+        // 3단계: base64 변환
+        console.log('3단계: Base64 변환 중...');
+        const base64Data = await convertToBase64(processedFile);
+        
+        // 4단계: API 호출
+        console.log('4단계: API 호출 중...');
         const result = await callGeminiAPI(base64Data);
         
-        // 결과 표시
+        // 5단계: 결과 표시
+        console.log('5단계: 결과 표시');
         showResults(result);
         
     } catch (error) {
-        console.error('분석 오류:', error);
-        alert('이미지 분석 중 오류가 발생했습니다. 다시 시도해주세요.');
+        console.error('분석 오류 상세:', error);
         hideLoading();
+        
+        let errorMessage = '이미지 분석 중 오류가 발생했습니다.\n\n';
+        
+        if (error.message.includes('API 키')) {
+            errorMessage += '문제: API 키가 설정되지 않았습니다.\n해결: config.js 파일을 확인해주세요.';
+        } else if (error.message.includes('네트워크')) {
+            errorMessage += '문제: 네트워크 연결 오류\n해결: 인터넷 연결을 확인해주세요.';
+        } else if (error.message.includes('크기')) {
+            errorMessage += '문제: 이미지 파일이 너무 큽니다.\n해결: 5MB 이하의 이미지를 사용해주세요.';
+        } else {
+            errorMessage += `오류 내용: ${error.message}\n\n개발자 도구(F12)에서 자세한 오류를 확인할 수 있습니다.`;
+        }
+        
+        alert(errorMessage);
     }
+}
+
+// 이미지 처리 (크기 압축)
+function processImage(file) {
+    return new Promise((resolve, reject) => {
+        const maxSize = 5 * 1024 * 1024; // 5MB
+        const maxWidth = 1024;
+        const maxHeight = 1024;
+        
+        if (file.size <= maxSize) {
+            resolve(file);
+            return;
+        }
+        
+        console.log('이미지가 큼, 압축 중...', file.size);
+        
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        
+        img.onload = function() {
+            // 비율 유지하면서 크기 조절
+            let { width, height } = img;
+            
+            if (width > maxWidth || height > maxHeight) {
+                const ratio = Math.min(maxWidth / width, maxHeight / height);
+                width *= ratio;
+                height *= ratio;
+            }
+            
+            canvas.width = width;
+            canvas.height = height;
+            
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            canvas.toBlob((blob) => {
+                if (blob) {
+                    const compressedFile = new File([blob], file.name, {
+                        type: 'image/jpeg',
+                        lastModified: Date.now(),
+                    });
+                    console.log('압축 완료:', compressedFile.size);
+                    resolve(compressedFile);
+                } else {
+                    reject(new Error('이미지 압축 실패'));
+                }
+            }, 'image/jpeg', 0.8);
+        };
+        
+        img.onerror = () => reject(new Error('이미지 로드 실패'));
+        img.src = URL.createObjectURL(file);
+    });
 }
 
 // 이미지를 base64로 변환
@@ -196,11 +336,10 @@ function convertToBase64(file) {
 // Gemini API 호출
 async function callGeminiAPI(base64Data) {
     // API 키 확인
-    if (!window.CONFIG || !window.CONFIG.GEMINI_API_KEY) {
-        throw new Error('API 키가 설정되지 않았습니다. config.js 파일을 확인해주세요.');
+    const API_KEY = getApiKey();
+    if (!API_KEY) {
+        throw new Error('API 키가 설정되지 않았습니다.');
     }
-    
-    const API_KEY = window.CONFIG.GEMINI_API_KEY;
     const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
     
     const prompt = `이 음식 이미지를 보고 음식 이름과 칼로리를 알려주세요. 다음 JSON 형식으로 답변해주세요:
