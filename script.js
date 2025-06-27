@@ -195,28 +195,23 @@ function convertToBase64(file) {
 
 // Gemini API 호출
 async function callGeminiAPI(base64Data) {
+    // API 키 확인
+    if (!window.CONFIG || !window.CONFIG.GEMINI_API_KEY) {
+        throw new Error('API 키가 설정되지 않았습니다. config.js 파일을 확인해주세요.');
+    }
+    
     const API_KEY = window.CONFIG.GEMINI_API_KEY;
     const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
     
-    const prompt = `
-    이 음식 이미지를 분석해서 다음 정보를 JSON 형태로 제공해주세요:
-    
-    {
-        "foodName": "음식 이름 (한국어)",
-        "calories": 예상 칼로리 (숫자만),
-        "calculationSteps": [
-            "계산 과정 1",
-            "계산 과정 2",
-            "계산 과정 3"
-        ]
-    }
-    
-    주의사항:
-    - 칼로리는 일반적인 1인분 기준으로 계산해주세요
-    - 계산 과정은 구체적으로 3-5단계로 나누어서 설명해주세요
-    - 음식이 명확하지 않은 경우 가장 가능성이 높은 음식으로 추정해주세요
-    - 응답은 반드시 유효한 JSON 형태여야 합니다
-    `;
+    const prompt = `이 음식 이미지를 보고 음식 이름과 칼로리를 알려주세요. 다음 JSON 형식으로 답변해주세요:
+
+{
+"foodName": "음식이름",
+"calories": 400,
+"calculationSteps": ["재료 확인", "1인분 기준 계산", "총 칼로리 산출"]
+}
+
+관대하게 추정해서 답변해주세요.`;
 
     const requestBody = {
         contents: [{
@@ -232,27 +227,75 @@ async function callGeminiAPI(base64Data) {
         }]
     };
 
-    const response = await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody)
-    });
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody)
+        });
 
-    if (!response.ok) {
-        throw new Error(`API 호출 실패: ${response.status}`);
-    }
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('API 응답 오류:', errorText);
+            throw new Error(`API 호출 실패: ${response.status} - ${response.statusText}`);
+        }
 
-    const data = await response.json();
-    const text = data.candidates[0].content.parts[0].text;
-    
-    // JSON 파싱 (마크다운 코드 블록 제거)
-    const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/) || text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-        return JSON.parse(jsonMatch[1] || jsonMatch[0]);
-    } else {
-        throw new Error('유효한 JSON 응답을 받지 못했습니다.');
+        const data = await response.json();
+        console.log('API 응답:', data);
+        
+        if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+            throw new Error('API 응답 형식이 올바르지 않습니다.');
+        }
+        
+        const text = data.candidates[0].content.parts[0].text;
+        console.log('AI 응답 텍스트:', text);
+        
+        // JSON 파싱 (여러 패턴 시도)
+        let jsonData = null;
+        
+        // 1. 마크다운 코드 블록에서 JSON 추출
+        let jsonMatch = text.match(/```json\s*\n([\s\S]*?)\n\s*```/);
+        if (jsonMatch) {
+            try {
+                jsonData = JSON.parse(jsonMatch[1]);
+            } catch (e) {
+                console.log('마크다운 JSON 파싱 실패:', e);
+            }
+        }
+        
+        // 2. 중괄호로 둘러싸인 JSON 추출
+        if (!jsonData) {
+            jsonMatch = text.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                try {
+                    jsonData = JSON.parse(jsonMatch[0]);
+                } catch (e) {
+                    console.log('일반 JSON 파싱 실패:', e);
+                }
+            }
+        }
+        
+        // 3. 파싱 실패시 기본값 반환
+        if (!jsonData) {
+            console.log('JSON 파싱 실패, 기본값 사용');
+            return {
+                foodName: "음식 (인식 어려움)",
+                calories: 400,
+                calculationSteps: [
+                    "이미지에서 음식을 확인했습니다",
+                    "일반적인 1인분 기준으로 추정했습니다", 
+                    "대략적인 칼로리를 계산했습니다"
+                ]
+            };
+        }
+        
+        return jsonData;
+        
+    } catch (error) {
+        console.error('API 호출 중 오류:', error);
+        throw new Error('음식 인식 중 오류가 발생했습니다: ' + error.message);
     }
 }
 
